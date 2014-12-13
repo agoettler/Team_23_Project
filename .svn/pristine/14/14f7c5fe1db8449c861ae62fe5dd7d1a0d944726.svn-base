@@ -1,0 +1,161 @@
+package Team23_DuckHunt;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.SocketException;
+
+
+/*
+ * Introduction to Software Design Fall 2014
+ * Game: Duck Hunt
+ * Authors: 
+ * 		Andrew Goettler
+ * 		Joshua Svenson
+ * Team Project: Arcade Game Redux
+ * Problem Description: The goal of this project is to implement a classic arcade game in JavaTM 
+ * 		with modern twists. A tutorial is provided for help getting started implementing the 
+ * 		graphics, but this is intended as a guide and not as free code to just use. 
+ * 		Because help is provided for the graphics, you may want to try and differentiate 
+ * 		your game from other students by adding new and unique features.
+ * Problem Documentation:
+ * 		Coding Competition Rules: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509067/View
+ * 		Problem Description: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509071/View
+ */
+
+public class ScoreServer {
+	
+	private File outputFile;
+	private DatagramSocket socket;
+	private ScoreList highScoreList;
+	private BufferedWriter writer;
+	private byte[] data;
+	
+	public ScoreServer() throws IOException
+	{
+		outputFile = new File("BetterHighScores.txt");
+		
+		try {
+			outputFile.createNewFile();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		
+		highScoreList = new ScoreList(outputFile);
+		
+		try
+		{
+			socket = new DatagramSocket( 6040 );
+		} catch ( SocketException socketException )
+		{
+			socketException.printStackTrace();
+			System.exit( 1 );
+		}
+	}
+	
+	public void waitForPackets()
+	{
+		while( true )
+		{
+			try
+			{
+				byte[] data = new byte[100];
+				DatagramPacket receivePacket = new DatagramPacket( data, data.length );
+				
+				socket.receive( receivePacket );
+				
+				String message = new String( receivePacket.getData(), 0, receivePacket.getLength());
+				
+				if( message.equals("listPlease") )
+				{
+					sendHighScoreToClient( receivePacket );
+				}
+				else
+				{
+					String[] messageArray = message.split(" ");
+					Score newScore = new Score( messageArray[0], Integer.parseInt(messageArray[1]));
+					if(checkIfHighScore( newScore ) == true)
+					{
+						updateHighScore( newScore );
+						updateScoreFile();
+					}
+				}
+			} catch ( IOException ioException )
+			{
+				ioException.printStackTrace();
+			}
+		}
+	}
+	
+	public void sendHighScoreToClient( DatagramPacket receivePacket ) throws IOException
+	{		
+		data = highScoreList.toString().getBytes();
+		
+		DatagramPacket sendPacket = new DatagramPacket(data, data.length, receivePacket.getAddress(), receivePacket.getPort());
+		
+		try {
+			socket.send( sendPacket );
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public boolean checkIfHighScore( Score newHighScore )
+	{
+		
+		if(highScoreList.getScoreListSize() < 10)
+		{
+			return true;
+		}
+		if(highScoreList.getScoreListSize() == 0){
+			return true;
+		}
+		if( newHighScore.getScore() > highScoreList.getLeastValue().getScore())
+		{
+			return true;
+		}
+		return false;
+	}
+	
+	public void updateHighScore( Score newHighScore )
+	{
+		highScoreList.add( newHighScore );
+		updateScoreFile();
+	}
+	
+	private void updateScoreFile()
+	{
+		try {
+			writer = new BufferedWriter( new FileWriter(outputFile) );
+			for( int index = 0; index < highScoreList.getScoreListSize(); index++)
+			{
+				writer.write(highScoreList.getHighScoresList().get(index).toString() + "\n");
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally
+		{
+			try {
+				writer.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public void closeConnection()
+	{
+		socket.close();
+	}
+	
+	public static void main( String[] args ) throws IOException
+	{
+		ScoreServer application = new ScoreServer();
+		application.waitForPackets();
+		application.closeConnection();
+	}
+}

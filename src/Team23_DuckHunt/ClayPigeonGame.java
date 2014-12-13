@@ -1,0 +1,202 @@
+package Team23_DuckHunt;
+import java.awt.Color;
+import java.awt.Graphics2D;
+
+import javax.swing.JFrame;
+
+
+/*
+ * Introduction to Software Design Fall 2014
+ * Game: Duck Hunt
+ * Authors: 
+ * 		Andrew Goettler
+ * 		Joshua Svenson
+ * Team Project: Arcade Game Redux
+ * Problem Description: The goal of this project is to implement a classic arcade game in JavaTM 
+ * 		with modern twists. A tutorial is provided for help getting started implementing the 
+ * 		graphics, but this is intended as a guide and not as free code to just use. 
+ * 		Because help is provided for the graphics, you may want to try and differentiate 
+ * 		your game from other students by adding new and unique features.
+ * Problem Documentation:
+ * 		Coding Competition Rules: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509067/View
+ * 		Problem Description: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509071/View
+ */
+
+public class ClayPigeonGame extends Game
+{
+	/**
+	 * ID for serialization
+	 */
+	private static final long serialVersionUID = 1L;
+	/**
+	 * constant for the number of shots allowed in this game
+	 */
+	private final static int SHOTS_ALLOWED = 1;
+	/**
+	 * counter for the number of clays currently spawned in this round
+	 */
+	private int clayCount;
+	/**
+	 * counter for the number of clays hit
+	 */
+	private int claysHit;
+	private int round = 1;
+	private int claysPerRound = 5;
+	private int shotsLeft;
+	private boolean mouseFired;
+	
+	public ClayPigeonGame( JFrame gameFrame )
+	{
+		super( gameFrame );
+		mouseFired = false;
+	}
+
+	@Override public void initializeEntities()
+	{	
+		
+		// increment the clay counter and round counter
+		clayAndRoundCounter();
+		
+		// create a new entity with a clay pigeon sprite
+		Entity entity = new ClayPigeonEntity(this, "sprites/Clay.png", 400, 500);
+		
+		// add the entity to the ArrayList of game Entities
+		this.getEntities().add(entity);
+		
+	}
+	
+	@Override public void mousePress()
+	{
+		if(this.shotsLeft > 0)
+		{
+			super.mousePress();
+			
+			// decrement the shot counter
+			this.shotsLeft--;
+		}
+	}
+	
+	@Override public void mouseRelease()
+	{
+		super.mouseRelease();
+		
+		// reset mouse fired
+		this.mouseFired = false;
+	}
+	
+	@Override public boolean getMousePressed()
+	{
+		if(!this.mouseFired)
+		{
+			// if the mouse is in fact pressed, indicate that the mouse has fired
+			if(super.getMousePressed())
+			{
+				this.mouseFired = true;
+			}
+			
+			// return the mousePressed status
+			return super.getMousePressed();
+		}
+		
+		// if the mouse has fired, return false
+		else
+		{
+			return false;
+		}
+	}
+
+	@Override public void drawBackgroud(Graphics2D g)
+	{
+		g.setColor(Color.CYAN);
+		g.fillRect(0, 0, 800, 500);
+		
+		g.setColor(Color.GREEN);
+		g.fillRect(0,  500,  800,  100);
+	}
+	
+	@Override public void drawForeground(Graphics2D g) 
+	{
+		drawTrapHouse(g);
+	}
+	
+	@Override public void drawText(Graphics2D g)
+	{
+		g.setColor(Color.white);
+		g.drawString("Score: " + this.getGameScore(),10, 540);
+		g.drawString("Round: " + this.getRound(), 10, 560);
+		g.drawString("Clays Hit: " + claysHit, 10, 580);
+		g.drawString("Shots Left: " + this.shotsLeft, 10, 520);
+	}
+	
+	private void drawTrapHouse(Graphics2D g)
+	{
+		g.setColor(Color.DARK_GRAY);
+		g.fillRect(260, 450,  300,  150);
+		
+		g.setColor(Color.DARK_GRAY);
+		g.fillRect(235,  435,  350,  50);
+		
+		g.setColor(Color.LIGHT_GRAY);
+		g.fillRect(250, 450, 300, 150);
+		
+		g.setColor(Color.LIGHT_GRAY);
+		g.fillRect(225,  440,  350,  50);
+	}
+	
+	public void notifyPigeonShot()
+	{
+		claysHit++;
+		setGameScore(getGameScore() + 100*round);
+		//initializeEntities();
+	}
+	
+	public void clayAndRoundCounter()
+	{
+		// set the number of shots left to 1
+		this.shotsLeft = SHOTS_ALLOWED;
+		
+		// increment the clay counter
+		setClayCount(clayCount + 1);
+		
+		// if the clay limit is reached, advance the round counter
+		if(clayCount > getClaysPerRound())
+		{
+			// if the round limit is reached, end the game
+			if(round >= 5)
+			{
+				this.endGame();
+			}
+			
+			// increment the round counter
+			setRound(round+1);
+			
+			// reset the clay counter
+			clayCount = 1;
+		}
+	}
+	
+	public void setClayCount(int count)
+	{
+		clayCount = count;
+	}
+	
+	public int getClayCount()
+	{
+		return clayCount;
+	}
+	
+	public void setRound(int newRound)
+	{
+		round = newRound;
+	}
+	
+	public int getRound()
+	{
+		return round;
+	}
+	
+	public int getClaysPerRound()
+	{
+		return claysPerRound;
+	}
+}

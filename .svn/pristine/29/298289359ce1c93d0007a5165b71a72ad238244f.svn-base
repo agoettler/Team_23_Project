@@ -1,0 +1,610 @@
+package Team23_DuckHunt;
+
+/*
+ * Introduction to Software Design Fall 2014
+ * Game: Duck Hunt
+ * Authors: 
+ * 		Andrew Goettler
+ * 		Joshua Svenson
+ * Team Project: Arcade Game Redux
+ * Problem Description: The goal of this project is to implement a classic arcade game in JavaTM 
+ * 		with modern twists. A tutorial is provided for help getting started implementing the 
+ * 		graphics, but this is intended as a guide and not as free code to just use. 
+ * 		Because help is provided for the graphics, you may want to try and differentiate 
+ * 		your game from other students by adding new and unique features.
+ * Problem Documentation:
+ * 		Coding Competition Rules: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509067/View
+ * 		Problem Description: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509071/View
+ */
+
+import java.awt.Canvas;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Graphics2D;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.image.BufferStrategy;
+import java.util.ArrayList;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+
+/**
+ * 
+ * @author Andrew Goettler
+ * @author Joshua Svenson
+ *
+ */
+public abstract class Game extends Canvas
+{
+	/**
+	 * identification number for serialization
+	 */
+	private static final long serialVersionUID = 1L;
+	/**
+	 * the JFrame this Game is running in
+	 */
+	private JFrame gameFrame;
+	/**
+	 * the JPanel used for displaying graphics while the game is running 
+	 */
+	private JPanel gameScreen;
+	/**
+	 * the score of the current game
+	 */
+	private int gameScore;
+	/**
+	 * the strategy for managing the accelerated graphics buffer
+	 */
+	private BufferStrategy graphicsStrategy;
+	/**
+	 * an ArrayList containing the entities used by the game
+	 */
+	private ArrayList<Entity> entities;
+	/**
+	 * an ArrayList containing the entities that should be removed from the game
+	 */
+	private ArrayList<Entity> removableEntities;
+	/** 
+	 * an ArrayList containing the entities that require entity logic
+	 */
+	private ArrayList<Entity> logicEntities;
+	/**
+	 * a private class implementing mouseListener and mouseMotionListener, for handling mouse inputs
+	 */
+	private UserControlledCursorHandler cursorHandler;
+	/**
+	 * a boolean enabling the game loop to run continuously
+	 */
+	private boolean gameRunning = true;
+	/**
+	 * a boolean flag to inform the game loop that game logic should be executed
+	 */
+	private boolean gameLogicRequired = false;
+	/**
+	 * a boolean flag to inform the game loop that entity logic should be executed
+	 */
+	private boolean entityLogicRequired = false;
+	/**
+	 * a boolean flag to inform the game loop that the loop should terminate after the current cycle
+	 */
+	private boolean gameEndRequired = false;
+	/**
+	 * a boolean flat to inform the game loop that the mouse is pressed
+	 */
+	private boolean mousePressed;
+	/**
+	 * an integer to keep track of the cursor's most recent x-coordinate
+	 */
+	private int mouseX;
+	/**
+	 * an integer to keep track of the cursor's most recent y-coordinate
+	 */
+	private int mouseY;
+	
+	/**
+	 * Constructor for Game objects. This method performs initialization activities that are
+	 * common to all objects of the Game class.
+	 * 
+	 * @param gameFrame the JFrame the game will run in
+	 */
+	public Game(JFrame gameFrame)
+	{
+		this.gameFrame = gameFrame;
+		gameScreen = new JPanel(); // create a new JPanel for the game to display graphics in
+		
+		this.getGameScreen().setPreferredSize(new Dimension(800, 600)); // set the size of the gameScreen
+		this.getGameScreen().setLayout(null);
+		this.setBounds(0, 0, 800, 600); // set the size of the canvas
+		this.getGameScreen().add(this); // add the canvas to the gameScreen JPanel
+		
+		gameFrame.setContentPane(getGameScreen()); // make our gameScreen the contentPane of the gameFrame
+		gameFrame.pack(); // pack it to make it the right size
+		gameFrame.validate(); // validate it to make it visible
+		
+		this.setIgnoreRepaint(true); // turn repainting off in order to use accelerated graphics
+		
+		// create a buffer strategy for accelerated graphics
+		this.createBufferStrategy(2);
+		this.graphicsStrategy = this.getBufferStrategy();
+		
+		// initialize the entities ArrayList and the removable entities array ArrayList
+		this.entities = new ArrayList<Entity>();
+		this.removableEntities = new ArrayList<Entity>();
+		this.logicEntities = new ArrayList<Entity>();
+		
+		// initialize the entities
+		this.initializeEntities();
+		
+		// use the crosshair cursor - it looks nice!
+		this.getGameScreen().setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
+		
+		// create and register a mouse listener
+		cursorHandler = new UserControlledCursorHandler();
+		this.addMouseListener(cursorHandler);
+		this.addMouseMotionListener(cursorHandler);
+		this.requestFocus();
+	}
+	
+	/**
+	 * This abstract method must be implemented by classes extending the Game class.
+	 * When implemented, it is used for creating the entities used in a Game.
+	 * An example can be seen in the TestGame class.
+	 * 
+	 * At this step, the sprite and initial location of each entity is set.
+	 */
+	public abstract void  initializeEntities();
+	
+	/**
+	 * This method is the primary game loop. Graphics updating, entity movement, 
+	 * collision detection, and game and entity logic are all performed in this
+	 * method. This method is declared final because it should be opaque to the
+	 * subclasses of Game; subclasses should manipulate the game using other
+	 * methods.
+	 * 
+	 * Drawing is of particular note; all methods perform the drawing using a
+	 * Graphics 2D object. Graphics drawn later appear above graphics drawn earlier.
+	 * Since this method is final, several "hooks" are provided for the subclasses
+	 * to control drawing: drawBackground, drawForeground, drawText, and the draw
+	 * method of the Entity class. The order of drawing is as follows: 
+	 * 		1. background (using drawBackground)
+	 * 		2. entities (using the draw method of the Entity class)
+	 * 		3. foreground (using drawForeground)
+	 * 		4. text (using drawText)
+	 * 		
+	 */
+	public final void gameLoop()
+	{
+		gameRunning = true; // set to true as we enter the game loop
+		
+		// before kicking off the game loop, get the current system time
+		long lastLoopTime = System.currentTimeMillis();
+		
+		// the game loop runs until the game is finished
+		while(gameRunning)
+		{
+			// find the time since the last game loop
+			long delta = System.currentTimeMillis() - lastLoopTime;
+			
+			// update the current system time
+			lastLoopTime = System.currentTimeMillis();
+			
+			// determine if the game loop is required to end after this cycle
+			if(this.gameEndRequired)
+			{
+				this.gameRunning = false;
+			}
+			
+			// get the graphics context for this canvas
+			Graphics2D g = (Graphics2D) getStrategy().getDrawGraphics();
+			
+			// draw the background
+			this.drawBackgroud(g);
+			
+			// move all of the game entities
+			for(int i=0; i < this.getEntities().size(); i++) 
+			{
+				this.getEntities().get(i).move(delta);
+			}
+			
+			// draw the game entities
+			for(int i = 0; i < this.getEntities().size(); i++)
+			{
+				this.getEntities().get(i).draw(g);
+			}
+			
+			// check for collisions
+			for( int i = 0; i < this.getEntities().size(); i++)
+			{
+				Entity firstEntity = this.getEntities().get(i);
+				
+				// if the mouse is pressed, check to see if the mouse intersects the entity
+				if(this.getMousePressed())
+				{
+					// check if the mouse intersects the entity's bounding box
+					if(firstEntity.getBounds().contains(mouseX, mouseY))
+					{
+						this.entityHitByMouse(firstEntity);
+					}
+				}
+				
+				// check for other collisions
+				for( int j = i + 1; j < this.getEntities().size(); j++)
+				{
+					Entity secondEntity = this.getEntities().get(j);
+					
+					if(firstEntity.collidesWith(secondEntity))
+					{
+						firstEntity.collidedWith(secondEntity);
+						secondEntity.collidedWith(firstEntity);
+					}
+				}
+			}
+			
+			// perform game logic if necessary
+			if(this.getGameLogicStatus())
+			{
+				this.setGameLogicStatus(false);
+				
+				for(int i = 0; i < this.getEntities().size(); i++)
+				{
+					this.getEntities().get(i).doGameLogic();
+				}				
+			}
+
+			// perform entity logic if necessary
+			if(this.getEntityLogicStatus())
+			{
+				this.setEntityLogicStatus(false);
+				
+				for(int i = 0; i < this.getLogicEntities().size(); i++)
+				{
+					this.getLogicEntities().remove(i).doEntityLogic();
+				}
+			}
+			
+			// remove any entities that need to be removed from the game
+			this.getEntities().removeAll(getRemovableEntities());
+			this.getLogicEntities().removeAll(this.getRemovableEntities());
+			this.getRemovableEntities().clear();
+			
+			// draw foreground
+			this.drawForeground(g);
+			
+			// draw any needed text to the screen
+			this.drawText(g);
+			
+			// drawing, movement, and entity updating is complete
+			
+			// flip the buffer using the BufferStrategy to update the Canvas
+			g.dispose();
+			getStrategy().show();
+			
+			// pause the game loop for a short time
+			try
+			{ 
+				Thread.sleep(10); 
+			} 
+			
+			catch (Exception e) 
+			{
+				e.printStackTrace();
+			}
+		}
+		
+		this.terminateGame(); // end the game and pass control back to the caller
+	}
+	
+	/* public game action methods */
+	
+	/**
+	 * This method draws the background for the game. The background is drawn as a rectangle
+	 * with the same bounds as the canvas.
+	 * 
+	 * @param g the Graphics2D context used for drawing
+	 */
+	public abstract void drawBackgroud(Graphics2D g);
+	
+	/**
+	 * This method draws the foreground for the game. Foreground objects appear in front
+	 * of the background and any entities on the canvas.
+	 * 
+	 * @param g the Graphics2D context used for drawing
+	 */
+	public abstract void drawForeground(Graphics2D g);
+	
+	/**
+	 * This method draws text to the screen. Text is drawn  very last and will appear
+	 * over all other graphical elements in the canvas
+	 * 
+	 * @param g the Graphics2D context used for drawing
+	 */
+	public void drawText(Graphics2D g)
+	{
+		
+	}
+	
+	/**
+	 * This method updates the position of the cursor as seen by the game loop.
+	 * 
+	 * @param x
+	 * @param y
+	 */
+	public void updateMousePosition(int x, int y)
+	{
+		mouseX = x;
+		mouseY = y;
+	}
+	
+	/**
+	 * This method calls the entity's hitByMouse method. It is provided to allow the subclass
+	 * an opportunity to perform actions when an entity is hit by the mouse.
+	 * 
+	 * @param entity
+	 */
+	public void entityHitByMouse(Entity entity)
+	{
+		entity.hitByMouse();
+	}
+	
+	/**
+	 * This method removes an entity from the game. The entity will be removed in the next game cycle.
+	 * 
+	 * @param entity
+	 */
+	public void removeEntity(Entity entity)
+	{
+		this.getRemovableEntities().add(entity);
+	}
+	
+	/**
+	 * This method informs the game loop that the entity logic should be ran.
+	 */
+	public void updateGameLogic()
+	{
+		this.setGameLogicStatus(true);
+	}
+	
+	/**
+	 * This method informs the game loop to do the entity logic for the selected entities
+	 * 
+	 * @param entity
+	 */
+	public void updateEntityLogic(Entity entity)
+	{
+		this.setEntityLogicStatus(true);
+		this.logicEntities.add(entity);
+	}
+	
+	/**
+	 * This method informs the game that it should end
+	 */
+	public void endGame()
+	{
+		this.gameEndRequired = true;
+	}
+	
+	/* public getter and setter methods */
+	
+	/**
+	 * This method is a public getter method for accessing the score of the Game object.
+	 * 
+	 * @return
+	 */
+	public int getGameScore()
+	{
+		return this.gameScore;
+	}
+	
+	/**
+	 * This method is a public setter for accessing the score of the Game object.
+	 * 
+	 * @param value
+	 */
+	public void setGameScore(int value)
+	{
+		this.gameScore = value;
+	}
+	
+	/**
+	 * This method is a public getter method for accessing the JFrame the Game object exists in.
+	 * 
+	 * @return
+	 */
+	public JFrame getGameFrame()
+	{
+		return this.gameFrame;
+	}
+	
+	/**
+	 * This method is a public getter method for accessing the BufferStrategy of the Game object.
+	 * 
+	 * @return
+	 */
+	public BufferStrategy getStrategy()
+	{
+		return this.graphicsStrategy;
+	}
+	
+	/**
+	 * This method is a public getter method for accessing the JPanel the Game object is running in.
+	 * @return
+	 */
+	public JPanel getGameScreen()
+	{
+		return this.gameScreen;
+	}
+	
+	/**
+	 * This method is a public getter method for accessing the ArrayList of entities currently in the game.
+	 * 
+	 * @return
+	 */
+	public ArrayList<Entity> getEntities()
+	{
+		return this.entities;
+	}
+	
+	/**
+	 * This method is a public getter method for accessing the ArrayList of entities to be removed from the game.
+	 * 
+	 * @return
+	 */
+	public ArrayList<Entity> getRemovableEntities()
+	{
+		return this.removableEntities;
+	}
+	
+	public ArrayList<Entity> getLogicEntities()
+	{
+		return this.logicEntities;
+	}
+	
+	/**
+	 * This method is a public getter method for determining if the game logic should be run
+	 * 
+	 * @return
+	 */
+	public boolean getGameLogicStatus()
+	{
+		return this.gameLogicRequired;
+	}
+	
+	/**
+	 * This method is a public setter method for setting the status of gameLogicRequired.
+	 * This method should only be used by subclasses of the Game class; for Entity objects,
+	 * the updateLogic() method is preferred.
+	 * 
+	 * @param status
+	 */
+	public void setGameLogicStatus(boolean status)
+	{
+		this.gameLogicRequired = status;
+	}
+	
+	/**
+	 * This method is a public getter method for determining if the entity logic should be run
+	 *
+	 * @return
+	 */
+	public boolean getEntityLogicStatus()
+	{
+		return this.entityLogicRequired;
+	}
+	
+	/**
+	 * This method is a public setter for setting the status of entityLogicRequired.
+	 * This method should only be used by subclasses of the Game class; for Entity objects,
+	 * the updateEntityLogic() method is preferred.
+	 * 
+	 * @param status
+	 */
+	public void setEntityLogicStatus(boolean status)
+	{
+		this.entityLogicRequired = status;
+	}
+	
+	/**
+	 * This method is used to access whether or not the mouse is pressed.
+	 * Subclasses can override this to more directly control mouse behavior.
+	 * 
+	 * @return
+	 */
+	public boolean getMousePressed()
+	{
+		return this.mousePressed;
+	}
+	
+	/**
+	 * This method sets the mousePressed status.
+	 * 
+	 * @param status
+	 */
+	public void setMousePressed(boolean status)
+	{
+		this.mousePressed = status;
+	}
+	
+	/* private methods */
+	
+	/**
+	 * This method acts as an informal destructor for the Game object. It resets the JFrame to the
+	 * state it was in before the Game constructor ran.
+	 * 
+	 */
+	private void terminateGame()
+	{		
+		this.setIgnoreRepaint(false); // allow Swing to repaint again
+		
+		this.gameFrame.remove(this.gameScreen); // remove the gameScreen JPanel
+		
+		this.gameFrame.validate(); // validate the JFrame
+	}
+	
+	/**
+	 * This method is called by the mouse handler when the mouse is pressed.
+	 */
+	public void mousePress()
+	{
+		this.mousePressed = true;
+	}
+	
+	/**
+	 * This method is called by the mouse handler when the mouse is released.
+	 */
+	public void mouseRelease()
+	{
+		this.mousePressed = false;
+	}
+	
+	/* private inner classes */
+	
+	/**
+	 * This is a a private innter event handler which implements the MouseListener
+	 * and MouseMotionListener inner classes. The methods communicate with the 
+	 * game loop indirectly by setting values which are accessed during execution
+	 * of the game loop, such as the mousePressed boolean.
+	 * 
+	 * @author Andrew Goettler
+	 *
+	 */
+	private class UserControlledCursorHandler implements MouseListener, MouseMotionListener
+	{
+
+		@Override public void mouseDragged(MouseEvent e)
+		{
+			updateMousePosition(e.getX(), e.getY());
+		}
+
+		@Override public void mouseMoved(MouseEvent e)
+		{
+			updateMousePosition(e.getX(), e.getY());
+		}
+
+		@Override public void mouseClicked(MouseEvent e)
+		{
+			
+		}
+
+		@Override public void mousePressed(MouseEvent e)
+		{
+			mousePress();
+		}
+
+		@Override public void mouseReleased(MouseEvent e)
+		{
+			mouseRelease();
+		}
+
+		@Override public void mouseEntered(MouseEvent e)
+		{
+			
+		}
+
+		@Override public void mouseExited(MouseEvent e)
+		{
+			
+		}
+	}
+}

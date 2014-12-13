@@ -1,0 +1,75 @@
+package Team23_DuckHunt;
+import java.awt.Graphics;
+import java.awt.Image;
+
+
+/*
+ * Introduction to Software Design Fall 2014
+ * Game: Duck Hunt
+ * Authors: 
+ * 		Andrew Goettler
+ * 		Joshua Svenson
+ * Team Project: Arcade Game Redux
+ * Problem Description: The goal of this project is to implement a classic arcade game in JavaTM 
+ * 		with modern twists. A tutorial is provided for help getting started implementing the 
+ * 		graphics, but this is intended as a guide and not as free code to just use. 
+ * 		Because help is provided for the graphics, you may want to try and differentiate 
+ * 		your game from other students by adding new and unique features.
+ * Problem Documentation:
+ * 		Coding Competition Rules: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509067/View
+ * 		Problem Description: https://icon.uiowa.edu/d2l/le/content/2352034/fullscreen/3509071/View
+ */
+
+/**
+ * The sprite for a game entity.
+ * 
+ * @author Andrew Goettler
+ *
+ */
+public class Sprite 
+{
+	
+	private Image image;
+	
+	/**
+	 * This constructor creates a new sprite from the specified image.
+	 * 
+	 * @param image image file for the sprite
+	 */
+	public Sprite(Image image)
+	{
+		this.image = image;
+	}
+	
+	/**
+	 * This method draws the sprite using the specified graphics context.
+	 * 
+	 * @param g graphics context used to draw the sprite
+	 * @param x location where sprite is to be drawn
+	 * @param y location where sprite is to be drawn
+	 */
+	public void draw(Graphics g, int x, int y)
+	{
+		g.drawImage(image, x, y, null);
+	}
+	
+	/**
+	 * This method returns the width of the sprite image, in pixels.
+	 * 
+	 * @return width of sprite in pixels
+	 */
+	public int getWidth()
+	{
+		return this.image.getWidth(null);
+	}
+	
+	/**
+	 * This method returns the height of the sprite image, in pixels
+	 * 
+	 * @return height of sprite in pixels
+	 */
+	public int getHeight()
+	{
+		return this.image.getHeight(null);
+	}
+}

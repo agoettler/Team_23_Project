@@ -1,0 +1,115 @@
+package Team23_DuckHunt;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+
+public class ScoreList {
+	private ArrayList<Score> highScores;
+	
+	public ScoreList(File inputFile) throws IOException
+	{
+		this( fileToString( inputFile ) );
+	}
+	
+	public ScoreList( String highScoreString )
+	{
+		highScores = new ArrayList<Score>();
+		
+		String initials;
+		int score;
+
+		String message = highScoreString;
+		String[] messageArray = message.split("\\s");
+		
+		if( message.length() != 0 ){
+			for( int i = 0; i < messageArray.length; i = i + 2)
+			{
+				initials = messageArray[i];
+				score = Integer.parseInt( messageArray[i + 1] );
+				
+				Score newScore = new Score( initials, score );
+				
+				highScores.add(newScore);
+			}
+		}
+		else{
+			highScores.add(new Score( "AAA", 0));
+		}
+	}
+	
+	private static String fileToString(File inputFile) throws IOException
+	{
+		BufferedReader reader = new BufferedReader(new FileReader(inputFile));
+		try
+		{
+			StringBuilder builder = new StringBuilder();
+			String line = reader.readLine();
+			
+			while(line != null)
+			{
+				builder.append(line);
+				builder.append("\n");
+				line = reader.readLine();
+			}
+			
+			return builder.toString();
+		}
+		finally
+		{
+			reader.close();
+		}
+	}
+	
+	public void add( Score highScore )
+	{
+		
+		int index = highScores.size() - 1;
+		
+		for(int j = index; j >= 0; j--)
+		{
+			if(highScore.getScore() > highScores.get(index).getScore())
+			{
+				index--;
+			}
+			else
+			{
+				break;
+			}
+		}
+		
+		highScores.add( index + 1, highScore );
+		if( highScores.size() > 10 )
+		{
+			highScores.remove(10);
+		}
+	}
+	
+	public ArrayList<Score> getHighScoresList()
+	{
+		return highScores;
+	}
+	
+	public int getScoreListSize()
+	{
+		return getHighScoresList().size();
+	}
+	
+	public Score getLeastValue()
+	{
+		return highScores.get( highScores.size() - 1);
+	}
+	
+	@Override
+	public String toString()
+	{
+		String message = "";
+		
+		for( int index = 0; index < highScores.size(); index++)
+		{
+			message += highScores.get(index).toString() + "\n";
+		}
+		return message;
+	}
+}
